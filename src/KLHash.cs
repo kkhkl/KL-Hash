@@ -6,8 +6,8 @@ namespace KLHash;
 
 public partial class MainForm : Form
 {
-	private static readonly long ProgressReportIntervalTicks = TimeSpan.FromMilliseconds(250).Ticks;
-	private static readonly long UiRefreshIntervalTicks = TimeSpan.FromMilliseconds(100).Ticks;
+	private static readonly TimeSpan ProgressReportInterval = TimeSpan.FromMilliseconds(250);
+	private static readonly TimeSpan UiRefreshInterval = TimeSpan.FromMilliseconds(100);
 	private const int BufferSizeMb = 4;
 	private const int BufferSizeBytes = BufferSizeMb * 1024 * 1024;
 	private CancellationTokenSource? _cts;
@@ -47,7 +47,7 @@ public partial class MainForm : Form
 	private void ResetUiState(bool clearCache)
 	{
 		txtDisplay.ReadOnly = false;
-		txtDisplay.Text = "拖拽文件到此界面进立即进行计算";
+		txtDisplay.Text = "拖拽文件到此界面即可进行计算";
 		txtDisplay.ForeColor = SystemColors.GrayText;
 		txtDisplay.Font = _fontRegular;
 		txtDisplay.ReadOnly = true;
@@ -76,7 +76,9 @@ public partial class MainForm : Form
 
 	private void UpdateDisplayResult()
 	{
-		if (_currentFilePaths is not { Length: > 0 } || _rawHashValuesCache is not { Length: > 0 } || _currentFilePaths.Length != _rawHashValuesCache.Length)
+		if (_currentFilePaths is not { Length: > 0 } ||
+		_rawHashValuesCache is not { Length: > 0 } ||
+		_currentFilePaths.Length != _rawHashValuesCache.Length)
 		return;
 		var sb = new StringBuilder();
 		bool isUpper = chkUpperCase.Checked;
@@ -191,7 +193,7 @@ public partial class MainForm : Form
 		{
 			var progress = new Progress<int>(p => progressBar.Value = Math.Clamp(p, 0, 100));
 			int errorCount = 0;
-			long lastUiUpdateTicks = DateTime.UtcNow.Ticks;
+			long lastUiUpdateTimestamp = Stopwatch.GetTimestamp();
 			await Task.Run(() =>
 			{
 				for (int i = 0; i < totalFiles; i++)
@@ -228,10 +230,9 @@ public partial class MainForm : Form
 						_rawHashValuesCache[i] = $"[错误: {ex.Message}]";
 						errorCount++;
 					}
-					long currentTicks = DateTime.UtcNow.Ticks;
-					if (i == totalFiles - 1 || (currentTicks - lastUiUpdateTicks) >= UiRefreshIntervalTicks)
+					if (i == totalFiles - 1 || Stopwatch.GetElapsedTime(lastUiUpdateTimestamp) >= UiRefreshInterval)
 					{
-						lastUiUpdateTicks = currentTicks;
+						lastUiUpdateTimestamp = Stopwatch.GetTimestamp();
 						Invoke(UpdateDisplayResult);
 					}
 				}
@@ -278,25 +279,26 @@ public partial class MainForm : Form
 		long totalRead = 0;
 		int lastPercent = -1;
 		int bytesRead;
-		long lastTicks = DateTime.UtcNow.Ticks;
+		long lastProgressTimestamp = Stopwatch.GetTimestamp();
 		using var hashAlgorithm = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-		var bufferSpan = buffer.AsSpan();
 		while ((bytesRead = fs.Read(buffer, 0, buffer.Length)) > 0)
 		{
 			ct.ThrowIfCancellationRequested();
 			totalRead += bytesRead;
 			int percent = totalBytes > 0 ? (int)(totalRead * 100 / totalBytes) : 0;
-			long currentTicks = DateTime.UtcNow.Ticks;
-			if (percent != lastPercent && (currentTicks - lastTicks >= ProgressReportIntervalTicks || percent == 100))
+			if (percent != lastPercent &&
+			(Stopwatch.GetElapsedTime(lastProgressTimestamp) >= ProgressReportInterval || percent == 100))
 			{
 				progress.Report(percent);
 				lastPercent = percent;
-				lastTicks = currentTicks;
+				lastProgressTimestamp = Stopwatch.GetTimestamp();
 			}
-			hashAlgorithm.AppendData(bufferSpan[..bytesRead]);
+			hashAlgorithm.AppendData(buffer.AsSpan(0, bytesRead));
 		}
 		if (lastPercent < 100)
 		progress.Report(100);
-		return Convert.ToHexString(hashAlgorithm.GetHashAndReset());
+		Span<byte> hashBuffer = stackalloc byte[32];
+		hashAlgorithm.GetHashAndReset(hashBuffer);
+		return Convert.ToHexString(hashBuffer);
 	}
 }
