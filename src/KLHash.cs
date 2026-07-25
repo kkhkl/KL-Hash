@@ -17,7 +17,7 @@ public partial class MainForm : Form
 	private readonly Font _fontRegular = new("Consolas", 12F, FontStyle.Regular);
 	private readonly Font _fontBold = new("Consolas", 12F, FontStyle.Bold);
 
-	public MainForm()
+	public MainForm(string[]? filePaths = null)
 	{
 		InitializeComponent();
 		FormClosing += (_, _) =>
@@ -25,6 +25,13 @@ public partial class MainForm : Form
 			_cts?.Cancel();
 			_cts?.Dispose();
 		};
+		if (filePaths is { Length: > 0 })
+		{
+			Shown += async (_, _) =>
+			{
+				await StartComputeAsync(filePaths);
+			};
+		}
 	}
 
 	protected override void Dispose(bool disposing)
@@ -41,7 +48,8 @@ public partial class MainForm : Form
 	{
 		base.OnLoad(e);
 		ResetUiState(clearCache: true);
-		ActiveControl = btnBrowse;
+		ActiveControl = lblTitle;
+		UpdateContextMenuButtonState();
 	}
 
 	private void ResetUiState(bool clearCache)
@@ -177,6 +185,64 @@ public partial class MainForm : Form
 
 	private void OnCaseToggle(object? sender, EventArgs e) => UpdateDisplayResult();
 
+	private void OnContextMenuToggleClick(object? sender, EventArgs e)
+	{
+		if (IsContextMenuRegistered())
+		{
+			RemoveContextMenu();
+			SetStatus("已从右键菜单移除");
+		}
+		else
+		{
+			AddContextMenu();
+			SetStatus("已添加到右键菜单");
+		}
+		UpdateContextMenuButtonState();
+	}
+
+	private static bool IsContextMenuRegistered()
+	{
+		using var key = Microsoft.Win32.Registry.ClassesRoot.OpenSubKey(@"*\shell\KLHash");
+		return key != null;
+	}
+
+	private void UpdateContextMenuButtonState()
+	{
+		btnContextMenu.Text = IsContextMenuRegistered() ? "从右键菜单移除" : "添加到右键菜单";
+	}
+
+	private static void AddContextMenu()
+	{
+		string exePath = Application.ExecutablePath;
+		var psi = new ProcessStartInfo
+		{
+			FileName = "reg.exe",
+			UseShellExecute = true,
+			Verb = "runas",
+			WindowStyle = ProcessWindowStyle.Hidden
+		};
+		psi.Arguments = @"ADD ""HKCR\*\shell\KLHash"" /ve /d ""计算 SHA-256"" /f";
+		Process.Start(psi)?.WaitForExit();
+		psi.Arguments = $@"ADD ""HKCR\*\shell\KLHash"" /v Icon /d ""{exePath},0"" /f";
+		Process.Start(psi)?.WaitForExit();
+		string commandValue = $"\"{exePath}\" \"%1\"";
+		psi.Arguments = $@"ADD ""HKCR\*\shell\KLHash\command"" /ve /d ""{commandValue}"" /f";
+		Process.Start(psi)?.WaitForExit();
+	}
+
+	private static void RemoveContextMenu()
+	{
+		var psi = new ProcessStartInfo
+		{
+			FileName = "reg.exe",
+			UseShellExecute = true,
+			Verb = "runas",
+			WindowStyle = ProcessWindowStyle.Hidden
+		};
+		psi.Arguments = @"DELETE ""HKCR\*\shell\KLHash"" /f";
+		Process.Start(psi)?.WaitForExit();
+	}
+
 	private async Task StartComputeAsync(string[] filePaths)
 	{
 		SetUiComputingState(isComputing: true);
@@ -258,7 +324,8 @@ public partial class MainForm : Form
 		catch (OperationCanceledException)
 		{
 			ResetUiState(clearCache: true);
-			SetStatus("已取消计算", isError: true);
+			lblStatus.Text = "已取消计算";
+			lblStatus.ForeColor = Color.FromArgb(41, 183, 203);
 		}
 		finally
 		{
