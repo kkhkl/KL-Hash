@@ -3,18 +3,20 @@ using System.Windows.Forms;
 
 namespace KLHash
 {
-	partial class MainForm
-	{
-		private Label lblTitle = null!;
-		private Panel bottomContainer = null!;
-		private TextBox txtDisplay = null!;
-		private ProgressBar progressBar = null!;
-		private Button btnBrowse = null!;
-		private Button btnCancel = null!;
-		private Button btnCopy = null!;
-		private CheckBox chkUpperCase = null!;
-		private Label lblStatus = null!;
-		private FlowLayoutPanel buttonPanel = null!;
+    partial class MainForm
+    {
+        private Label lblTitle = null!;
+        private Panel bottomContainer = null!;
+        private TextBox txtDisplay = null!;
+        private ProgressBar progressBar = null!;
+        private Button btnBrowse = null!;
+        private Button btnCancel = null!;
+        private Button btnCopy = null!;
+        private Button btnContextMenu = null!;
+        private CheckBox chkUpperCase = null!;
+        private Label lblStatus = null!;
+        private FlowLayoutPanel buttonPanel = null!;
+
         private void InitializeComponent()
         {
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(MainForm));
@@ -26,6 +28,7 @@ namespace KLHash
             btnCopy = new Button();
             btnCancel = new Button();
             btnBrowse = new Button();
+            btnContextMenu = new Button();
             chkUpperCase = new CheckBox();
             txtDisplay = new TextBox();
             bottomContainer.SuspendLayout();
@@ -79,6 +82,7 @@ namespace KLHash
             buttonPanel.Controls.Add(btnCopy);
             buttonPanel.Controls.Add(btnCancel);
             buttonPanel.Controls.Add(btnBrowse);
+            buttonPanel.Controls.Add(btnContextMenu);
             buttonPanel.Controls.Add(chkUpperCase);
             buttonPanel.Dock = DockStyle.Bottom;
             buttonPanel.FlowDirection = FlowDirection.RightToLeft;
@@ -125,10 +129,21 @@ namespace KLHash
             btnBrowse.Text = "选择文件";
             btnBrowse.Click += OnBrowseClick;
             // 
+            // btnContextMenu
+            // 
+            btnContextMenu.FlatStyle = FlatStyle.System;
+            btnContextMenu.Location = new Point(398, 5);
+            btnContextMenu.Margin = new Padding(10, 0, 0, 0);
+            btnContextMenu.Name = "btnContextMenu";
+            btnContextMenu.Size = new Size(110, 32);
+            btnContextMenu.TabIndex = 4;
+            btnContextMenu.Text = "添加到右键菜单";
+            btnContextMenu.Click += OnContextMenuToggleClick;
+            // 
             // chkUpperCase
             // 
             chkUpperCase.AutoSize = true;
-            chkUpperCase.Location = new Point(396, 10);
+            chkUpperCase.Location = new Point(260, 10);
             chkUpperCase.Margin = new Padding(10, 5, 0, 0);
             chkUpperCase.Name = "chkUpperCase";
             chkUpperCase.Size = new Size(112, 24);
@@ -167,7 +182,7 @@ namespace KLHash
             Name = "MainForm";
             Padding = new Padding(20);
             StartPosition = FormStartPosition.CenterScreen;
-            Text = "KL-Hash 计算器 1.1";
+            Text = "KL-Hash 计算器 1.2";
             DragDrop += OnDragDrop;
             DragEnter += OnDragEnter;
             bottomContainer.ResumeLayout(false);
